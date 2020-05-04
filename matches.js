@@ -1,5 +1,17 @@
 var pg = require('pg');
 var crypto = require('crypto-js');
+const url = require('url');
+const params = url.parse(process.env.HEROKU_POSTGRESQL_GRAY_URL);
+const auth = params.auth.split(':');
+
+const dbConfig = {
+  user: auth[0],
+  password: auth[1],
+  host: params.hostname,
+  port: params.port,
+  database: params.pathname.split('/')[1],
+  ssl: true
+};
 
 module.exports = function (app) {
     app.post('/save-match', function (request, response) {
@@ -25,8 +37,6 @@ module.exports = function (app) {
     })
 
     app.post('/get-match', function (request, response) {
-        console.log('Request: ', request.body);
-
         var signature = request.body.signature;
 
         var isValid = validate(signature);
@@ -55,7 +65,7 @@ module.exports = function (app) {
 
     saveMatchDataAsync = function (contextId, data) {
         return new Promise(function (resolve, reject) {
-            var pool = new pg.Pool()
+            var pool = new pg.Pool(dbConfig)
             pool.connect(function (err, client, done) {
                 client.query('SELECT * FROM matches WHERE context = $1::text', [contextId], function (err, result) {
                     if (err) {
@@ -91,7 +101,7 @@ module.exports = function (app) {
 
     loadMatchDataAsync = function (contextId) {
         return new Promise((resolve, reject) => {
-            var pool = new pg.Pool()
+            var pool = new pg.Pool(dbConfig)
             pool.connect((err, client, done) => {
                 if (err) {
                     return console.error('Error acquiring client', err.stack)
@@ -115,7 +125,7 @@ module.exports = function (app) {
     };
 
     validate = function (signedRequest) {
-        // You can set USE_SECURE_COMMUNICATION to false 
+        // You can set USE_SECURE_COMMUNICATION to false
         // when doing local testing and using the FBInstant mock SDK
         if (process.env.USE_SECURE_COMMUNICATION == false) {
             console.log('Not validating signature')
@@ -144,7 +154,7 @@ module.exports = function (app) {
     };
 
     getEncodedData = function (signedRequest) {
-        // You can set USE_SECURE_COMMUNICATION to false 
+        // You can set USE_SECURE_COMMUNICATION to false
         // when doing local testing and using the FBInstant mock SDK
         if (process.env.USE_SECURE_COMMUNICATION === false) {
             return payload;
@@ -157,12 +167,12 @@ module.exports = function (app) {
 
             /*
             Here's an example of encodedData can look like
-            { 
+            {
                 algorithm: 'HMAC-SHA256',
                 issued_at: 1520009634,
                 player_id: '123456789',
-                request_payload: 'backend_save' 
-            } 
+                request_payload: 'backend_save'
+            }
             */
 
             return encodedData.request_payload;
@@ -171,4 +181,3 @@ module.exports = function (app) {
         }
     };
 }
-
