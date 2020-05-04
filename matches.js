@@ -38,22 +38,27 @@ module.exports = function (app) {
 
     app.post('/get-match', function (request, response) {
         var signature = request.body.signature;
+        console.log('Signature: ', signature);
 
         var isValid = validate(signature);
 
         if (isValid) {
+            console.log('Valid');
             var contextId = getEncodedData(signature);
             //console.log(contextId);
 
             loadMatchDataAsync(contextId)
                 .then(function (result) {
                     if (result) {
+                        console.log('Success');
                         response.json({ 'success': true, 'contextId': contextId, 'empty': false, 'data': result });
                     } else {
+                        console.log('Success Not');
                         response.json({ 'success': true, 'contextId': contextId, 'empty': true });
                     }
                 })
                 .catch(function (err) {
+                  console.log('Error');
                     response.json({ 'success': false, 'error': err });
                 });
         } else {
