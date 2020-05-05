@@ -10,13 +10,19 @@ app.set('port', (process.env.PORT || 5000));
 app.use(bodyParser.json());
 app.use(cors());
 
-https.createServer({
-  key: fs.readFileSync('server.key'),
-  cert: fs.readFileSync('server.cert')
-}, app)
-.listen(app.get('port'), function () {
-  console.log('Node app is running on port', app.get('port'));
-})
+if (process.env.NODE_ENV === 'development') {
+  https.createServer({
+    key: fs.readFileSync('server.key'),
+    cert: fs.readFileSync('server.cert')
+  }, app)
+  .listen(app.get('port'), function () {
+    console.log('Local Server is running on port', app.get('port'));
+  })
+} else {
+  app.listen(app.get('port'), function () {
+    console.log('Live Server is running on port', app.get('port'));
+  })
+}
 
 require('./matches.js')(app);
 require('./bot.js')(app);
