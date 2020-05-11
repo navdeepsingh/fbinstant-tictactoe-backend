@@ -5,13 +5,15 @@ const params = url.parse(process.env.HEROKU_POSTGRESQL_GRAY_URL);
 const auth = params.auth.split(':');
 
 const dbConfig = {
-  user: auth[0],
-  password: auth[1],
-  host: params.hostname,
-  port: params.port,
-  database: params.pathname.split('/')[1],
-  ssl: true
+    user: auth[0],
+    password: auth[1],
+    host: params.hostname,
+    port: params.port,
+    database: params.pathname.split('/')[1]
 };
+if (process.env.NODE_ENV !== 'development') {
+    dbConfig.ssl = true;
+}
 
 module.exports = function (app) {
     app.post('/save-match', function (request, response) {
@@ -58,7 +60,34 @@ module.exports = function (app) {
                     }
                 })
                 .catch(function (err) {
-                  console.log('Error');
+                    console.log('Error');
+                    response.json({ 'success': false, 'error': err });
+                });
+        } else {
+            console.log('encoded data', getEncodedData(signature));
+            response.json({ 'success': false, 'error': 'invalid signature' });
+        }
+
+    })
+
+    app.post('/delete-match', function (request, response) {
+        var contextId = request.body.contextId;
+        var signature = request.body.signature;
+        var isValid = validate(signature);
+
+        if (isValid) {
+            deleteMatchDataAsync(contextId)
+                .then(function (result) {
+                    if (result) {
+                        console.log('Success');
+                        response.json({ 'success': true, 'contextId': contextId, 'empty': false, 'data': result });
+                    } else {
+                        console.log('Success Not');
+                        response.json({ 'success': true, 'contextId': contextId, 'empty': true });
+                    }
+                })
+                .catch(function (err) {
+                    console.log('Error');
                     response.json({ 'success': false, 'error': err });
                 });
         } else {
@@ -119,6 +148,35 @@ module.exports = function (app) {
 
                     if (result && result.rows.length > 0) {
                         resolve(result.rows[0].data);
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+            // pool shutdown
+            pool.end()
+        });
+    };
+
+    deleteMatchDataAsync = function (contextId) {
+        console.log(contextId);
+
+        return new Promise((resolve, reject) => {
+            var pool = new pg.Pool(dbConfig)
+            pool.connect((err, client, done) => {
+                if (err) {
+                    return console.error('Error acquiring client', err.stack)
+                }
+                client.query('DELETE FROM matches WHERE context = $1::text', [contextId], function (err, result) {
+                    done();
+                    if (err) {
+                        reject(err);
+                    }
+
+                    console.log(result);
+
+                    if (result) {
+                        resolve(result);
                     } else {
                         resolve();
                     }
